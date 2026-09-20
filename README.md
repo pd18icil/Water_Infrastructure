@@ -5,7 +5,7 @@ assignment](../../1_Introduction/Practice%20on%20Visualizing%20with%20Python%20%
 built on the same town-level water infrastructure dataset (Impact Open Data /
 AUB Linked Data — 1,137 towns across 25 districts, 7 governorates).
 
-**Live app:** _add the Streamlit Community Cloud link here after deploying_
+**Live app:** https://water-infrastructure.streamlit.app/
 
 ## What it does
 
