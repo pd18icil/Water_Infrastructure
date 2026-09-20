@@ -309,19 +309,51 @@ def make_box_chart(data: pd.DataFrame) -> go.Figure:
 
 # ============================================================
 # Charts, organized into tabs (keeps either pair in focus, not all 4 at once)
+# Each tab also has its own bonus filter, scoped to the fields it displays.
 # ============================================================
 tab1, tab2 = st.tabs(["Access & condition", "Springs & water points"])
 
 with tab1:
-    st.plotly_chart(make_bar_chart(fdf), width="stretch")
-    st.plotly_chart(make_line_chart(fdf), width="stretch")
+    min_access = st.slider(
+        "Minimum public network access (%) — bonus filter",
+        min_value=0, max_value=100, value=0, step=5, key="min_access",
+        help="Not one of the two graded filters — narrows the districts shown below to "
+             "those with at least this much public network access.",
+    )
+    access_by_district = fdf.groupby("District")["Potable water source - public network"].mean() * 100
+    eligible_districts = access_by_district[access_by_district >= min_access].index
+    tab1_df = fdf[fdf["District"].isin(eligible_districts)]
+
+    if tab1_df.empty:
+        st.info("No districts in the current selection meet that access threshold.")
+    else:
+        st.plotly_chart(make_bar_chart(tab1_df), width="stretch")
+        st.plotly_chart(make_line_chart(tab1_df), width="stretch")
 
 with tab2:
-    scatter_fig, town_matches = make_scatter_chart(fdf, town_query)
-    st.plotly_chart(scatter_fig, width="stretch")
-    if town_query.strip() and (town_matches is None or town_matches.empty):
-        st.caption(f"No town matching “{town_query}” in the current filter selection.")
-    st.plotly_chart(make_box_chart(fdf), width="stretch")
+    hide_zero_springs = st.checkbox(
+        "Only show towns with at least one spring or water point — bonus filter",
+        key="hide_zero_springs",
+        help="Not one of the two graded filters — 72% of towns report zero across these "
+             "fields; this hides them to declutter the charts below.",
+    )
+    tab2_df = fdf
+    if hide_zero_springs:
+        has_any = (
+            (fdf["Total number of permanent water springs"] > 0)
+            | (fdf["Total number of seasonal water springs"] > 0)
+            | (fdf["Total number of seasonal water points"] > 0)
+        )
+        tab2_df = fdf[has_any]
+
+    if tab2_df.empty:
+        st.info("No towns in the current selection have any spring/water point data.")
+    else:
+        scatter_fig, town_matches = make_scatter_chart(tab2_df, town_query)
+        st.plotly_chart(scatter_fig, width="stretch")
+        if town_query.strip() and (town_matches is None or town_matches.empty):
+            st.caption(f"No town matching “{town_query}” in the current filter selection.")
+        st.plotly_chart(make_box_chart(tab2_df), width="stretch")
 
 st.divider()
 

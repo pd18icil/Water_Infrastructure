@@ -22,13 +22,22 @@ AUB Linked Data — 1,137 towns across 25 districts, 7 governorates).
 - Includes a short design-justification write-up for each of the two linked
   filters, explaining the user question it answers, why that widget was
   chosen over an alternative, and which course concept it applies.
+- Two extra (non-graded) bonus filters, one per tab: a minimum public-network-
+  access slider on "Access & condition", and an "only show towns with a
+  spring/water point" toggle on "Springs & water points" — plus a town-name
+  search box that highlights a matching point on the scatter chart.
+- A custom `.streamlit/config.toml` theme applies the same Berytus Red /
+  black / gray palette used in the Plotly charts to every native widget
+  (chips, sliders, checkboxes, active tab), so the whole app — not just the
+  charts — matches the brand.
 
 ## Project structure
 
 ```
-streamlit_app.py       # the app (entry point for Streamlit Community Cloud)
-requirements.txt        # Python dependencies
-139a27528eedba4a898bd7b623307805.csv   # source dataset
+streamlit_app.py                        # the app (entry point for Streamlit Community Cloud)
+requirements.txt                        # Python dependencies
+.streamlit/config.toml                  # brand theme (Berytus Red palette)
+139a27528eedba4a898bd7b623307805.csv    # source dataset
 ```
 
 ## Running it locally
