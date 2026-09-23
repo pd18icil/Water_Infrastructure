@@ -599,17 +599,25 @@ def insight_card(title: str, body: str) -> None:
 
 
 # ============================================================
-# Charts, organized into tabs (keeps either pair in focus, not all 4 at once)
-# Each tab also has its own filter, scoped to the fields it displays.
+# Charts, split into two views so one topic is in focus at a time.
+# Each view has its own filter, scoped to the fields it displays.
 # ============================================================
-tab1, tab2 = st.tabs(["Access & condition", "Springs & water points"])
+VIEWS = ["Access & condition", "Springs & water points"]
+view = st.segmented_control(
+    "Choose a view",
+    VIEWS,
+    default=VIEWS[0],
+    required=True,
+    key="view",
+    width="stretch",
+)
 
-with tab1:
+if view == VIEWS[0]:
     filter_col, _ = st.columns([1, 2])
     with filter_col:
         min_access = st.slider(
             "Minimum public network access (%)",
-            min_value=0, max_value=100, step=5, key="min_access",
+            min_value=0, max_value=100, step=5, key="min_access", persist_state="page",
             help="Narrows the districts shown below to those with at least this much "
                  "public network access.",
         )
@@ -646,7 +654,7 @@ with tab1:
             st.plotly_chart(make_condition_profile_chart(tab1_df), width="stretch")
             insight_card(*profile_insight(tab1_df))
 
-with tab2:
+else:
     town_options = sorted(fdf["Town"].unique())
     if st.session_state.get("town_query") not in town_options:
         st.session_state.town_query = None
@@ -662,6 +670,7 @@ with tab2:
             options=town_options,
             index=None,
             key="town_query",
+            persist_state="page",
             placeholder="Start typing a town name…",
             help="Circles the selected town on the chart below.",
         )
@@ -679,6 +688,7 @@ with tab2:
     hide_zero_points = st.checkbox(
         "Only show towns with at least one seasonal water point",
         key="hide_zero_points",
+        persist_state="page",
         help="Ticked by default because most towns report zero, which flattens every box. "
              "Untick to include them.",
     )

@@ -10,7 +10,7 @@ AUB Linked Data — 1,137 towns across 25 districts, 7 governorates).
 ## What it does
 
 - Reuses the visualizations from Assignment 1 (bar, line, scatter, box —
-  organized into two tabs) and applies the same district relabeling /
+  organized into two views picked from a full-width switcher) and applies the same district relabeling /
   data-cleaning work. Network condition is shown as a 100% stacked bar per
   district (including the Unknown share), and the line chart runs across the
   ordered Good → Acceptable → Bad scale, comparing each district (gray) with
@@ -38,7 +38,7 @@ AUB Linked Data — 1,137 towns across 25 districts, 7 governorates).
   highlights a matching point.
 - A custom `.streamlit/config.toml` theme applies the same Berytus Red /
   black / gray palette used in the Plotly charts to every native widget
-  (chips, sliders, checkboxes, active tab), so the whole app — not just the
+  (chips, sliders, checkboxes, view switcher), so the whole app — not just the
   charts — matches the brand.
 
 ## Project structure
