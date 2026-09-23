@@ -23,6 +23,7 @@ STATE_COLS = {
     "State of the water network - bad": "Bad",
 }
 CONDITIONS = ["Good", "Acceptable", "Bad"]
+CONDITION_WEIGHTS = {c: f"{c} weight" for c in CONDITIONS + ["Unknown"]}
 CONDITION_COLORS = {"Good": BLACK, "Acceptable": GRAY, "Bad": BERYTUS_RED, "Unknown": PALE_GRAY}
 PERMANENT_SPRINGS = "Total number of permanent water springs"
 SEASONAL_SPRINGS = "Total number of seasonal water springs"
@@ -81,13 +82,26 @@ def load_data() -> pd.DataFrame:
     df["District"] = df["District"].str.replace(" District", "", regex=False)
     df["Governorate"] = df["District"].map(DISTRICT_TO_GOVERNORATE)
 
-    # towns flagging no state, or conflicting states (2 say both Good and Bad), count as Unknown
-    flags = df[list(STATE_COLS)]
-    df["Condition"] = np.where(
-        flags.sum(axis=1) == 1, flags.idxmax(axis=1).map(STATE_COLS), "Unknown"
+    # each town adds up to 1: a town flagging two states (2 say both Good and Bad) counts half in each
+    flags = df[list(STATE_COLS)].rename(columns=STATE_COLS)
+    n_flags = flags.sum(axis=1)
+    weights = flags.div(n_flags.replace(0, np.nan), axis=0).fillna(0)
+    weights["Unknown"] = (n_flags == 0).astype(float)
+    for cond, col in CONDITION_WEIGHTS.items():
+        df[col] = weights[cond]
+    df["Condition"] = flags.apply(
+        lambda row: " / ".join(c for c in CONDITIONS if row[c]) or "Unknown", axis=1
     )
 
     return df
+
+
+def condition_counts(data: pd.DataFrame) -> pd.DataFrame:
+    """Towns per district in each condition (Good/Acceptable/Bad/Unknown)."""
+    return (
+        data.groupby("District")[list(CONDITION_WEIGHTS.values())].sum()
+        .rename(columns={col: cond for cond, col in CONDITION_WEIGHTS.items()})
+    )
 
 
 df = load_data()
@@ -175,12 +189,12 @@ is_filtered = len(fdf) < len(df)
 
 
 def summarize(data: pd.DataFrame) -> dict:
-    known = data["Condition"] != "Unknown"
+    reporting = len(data) - data[CONDITION_WEIGHTS["Unknown"]].sum()
     no_springs = (data[PERMANENT_SPRINGS] == 0) & (data[SEASONAL_SPRINGS] == 0)
     return {
         "access": data[PUBLIC_NETWORK].mean() * 100,
-        "good": (data.loc[known, "Condition"] == "Good").mean() * 100 if known.any() else np.nan,
-        "unknown": (~known).mean() * 100,
+        "good": data[CONDITION_WEIGHTS["Good"]].sum() / reporting * 100 if reporting else np.nan,
+        "unknown": data[CONDITION_WEIGHTS["Unknown"]].mean() * 100,
         "no_springs": no_springs.mean() * 100,
     }
 
@@ -255,7 +269,7 @@ def make_bar_chart(data: pd.DataFrame) -> go.Figure:
 
 def make_condition_bar_chart(data: pd.DataFrame) -> go.Figure:
     categories = CONDITIONS + ["Unknown"]
-    counts = pd.crosstab(data["District"], data["Condition"]).reindex(columns=categories, fill_value=0)
+    counts = condition_counts(data)[categories]
     shares = counts.div(counts.sum(axis=1), axis=0) * 100
     # horizontal bars draw bottom-up, so this puts the most complete reporting on top
     shares = shares.sort_values("Unknown", ascending=False)
@@ -269,8 +283,8 @@ def make_condition_bar_chart(data: pd.DataFrame) -> go.Figure:
             text=[f"{v:.0f}%" if v >= 8 else "" for v in shares[cond]],
             textposition="inside", insidetextanchor="middle",
             textfont=dict(color=BLACK if cond == "Unknown" else "white"),
-            customdata=counts[cond],
-            hovertemplate="<b>%{y}</b><br>" + cond + ": %{x:.1f}% (%{customdata} towns)<extra></extra>",
+            customdata=counts[cond].round(),
+            hovertemplate="<b>%{y}</b><br>" + cond + ": %{x:.1f}% (%{customdata:.0f} towns)<extra></extra>",
         ))
     fig.update_layout(
         barmode="stack", height=max(260, 30 * len(shares) + 110),
@@ -282,13 +296,13 @@ def make_condition_bar_chart(data: pd.DataFrame) -> go.Figure:
 
 
 def national_profile() -> pd.Series:
-    reporting = df.loc[df["Condition"] != "Unknown", "Condition"]
-    return reporting.value_counts(normalize=True).reindex(CONDITIONS, fill_value=0) * 100
+    totals = condition_counts(df)[CONDITIONS].sum()
+    return totals / totals.sum() * 100
 
 
 def condition_profile(data: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
     """Good/Acceptable/Bad shares among each district's reporting towns, and distance from national."""
-    counts = pd.crosstab(data["District"], data["Condition"]).reindex(columns=CONDITIONS, fill_value=0)
+    counts = condition_counts(data)[CONDITIONS]
     reporting = counts.sum(axis=1)
     counts, reporting = counts[reporting > 0], reporting[reporting > 0]
     shares = counts.div(reporting, axis=0) * 100
@@ -449,7 +463,7 @@ def access_insight(data: pd.DataFrame) -> tuple[str, str]:
 
 
 def condition_insight(data: pd.DataFrame) -> tuple[str, str]:
-    unknown = (data["Condition"] == "Unknown").groupby(data["District"]).mean() * 100
+    unknown = data.groupby("District")[CONDITION_WEIGHTS["Unknown"]].mean() * 100
 
     if len(unknown) == 1:
         return (
@@ -482,13 +496,13 @@ def profile_insight(data: pd.DataFrame) -> tuple[str, str]:
         title = "Against the national pattern"
         body += (
             f"In {most}, the split is {r['Good']:.0f}% Good, {r['Acceptable']:.0f}% Acceptable "
-            f"and {r['Bad']:.0f}% Bad, based on {n} reporting towns."
+            f"and {r['Bad']:.0f}% Bad, based on {n:.0f} reporting towns."
         )
     else:
         title = f"{most} stands apart"
         body += (
             f"{most} differs most from that pattern, with {r['Good']:.0f}% Good and "
-            f"{r['Bad']:.0f}% Bad across its {n} reporting towns."
+            f"{r['Bad']:.0f}% Bad across its {n:.0f} reporting towns."
         )
     if n < 15:
         body += " With so few reporting towns, a handful of answers can swing these shares."
@@ -606,8 +620,7 @@ with tab1:
 
         chart_title(
             "Water network condition by district",
-            "Share of all towns in each district. Sorted from most to least complete "
-            "reporting; two towns that report both Good and Bad count as Unknown.",
+            "Share of all towns in each district, sorted from most to least complete reporting.",
         )
         st.plotly_chart(make_condition_bar_chart(tab1_df), width="stretch")
         insight_card(*condition_insight(tab1_df))
