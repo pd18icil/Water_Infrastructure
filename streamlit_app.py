@@ -280,14 +280,13 @@ def make_box_chart(data: pd.DataFrame) -> go.Figure:
 
     fig = px.box(
         plot_df, x="District", y="Seasonal water points (log1p)",
-        title="Distribution of seasonal water points by district",
         points="outliers",
         hover_data={"Seasonal water points (log1p)": False, "Total number of seasonal water points": True},
         color_discrete_sequence=[BERYTUS_RED],
     )
     fig.update_traces(marker=dict(color=BLACK, size=5), line=dict(color=BERYTUS_RED))
     fig.update_yaxes(tickvals=tick_positions, ticktext=[str(v) for v in tick_values], title="Seasonal water points")
-    fig.update_layout(xaxis_tickangle=-30, height=460, font=BRAND_FONT, title_font=BRAND_TITLE_FONT)
+    fig.update_layout(xaxis_tickangle=-30, height=420, font=BRAND_FONT, title_font=BRAND_TITLE_FONT)
     return fig
 
 
@@ -366,6 +365,7 @@ with tab2:
         "Meanwhile, 55% of all towns report zero springs of either type.",
     )
 
+    st.markdown(":red[**Distribution of seasonal water points by district**]")
     hide_zero_points = st.checkbox(
         "Only show towns with at least one seasonal water point",
         key="hide_zero_points",
