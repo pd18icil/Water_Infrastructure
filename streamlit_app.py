@@ -254,7 +254,7 @@ def make_scatter_chart(data: pd.DataFrame, highlight_query: str = "") -> go.Figu
     fig.update_traces(marker=dict(size=8, opacity=0.75, line=dict(width=0)))
 
     if highlight_query.strip():
-        matches = plot_df[plot_df["Town"].str.contains(highlight_query.strip(), case=False, na=False)]
+        matches = plot_df[plot_df["Town"] == highlight_query.strip()]
         if not matches.empty:
             fig.add_trace(go.Scatter(
                 x=matches["Permanent springs (log1p)"], y=matches["Seasonal springs (log1p)"],
@@ -317,16 +317,22 @@ with tab1:
         st.plotly_chart(make_line_chart(tab1_df), width="stretch")
 
 with tab2:
-    town_query = st.text_input(
-        "Highlight a town",
-        key="town_query",
-        placeholder="e.g. Baabdat",
-        help="Highlights a matching town on the scatter chart below.",
-    )
+    town_options = sorted(fdf["Town"].unique())
+    if st.session_state.get("town_query") not in town_options:
+        st.session_state.town_query = None
+
+    search_col, _ = st.columns([1, 2])
+    with search_col:
+        town_query = st.selectbox(
+            "Highlight a town",
+            options=town_options,
+            index=None,
+            key="town_query",
+            placeholder="Start typing a town name…",
+            help="Highlights the selected town on the scatter chart below.",
+        ) or ""
     scatter_fig, town_matches = make_scatter_chart(fdf, town_query)
     st.plotly_chart(scatter_fig, width="stretch")
-    if town_query.strip() and (town_matches is None or town_matches.empty):
-        st.caption(f"No town matching “{town_query}” in the current filter selection.")
 
     hide_zero_points = st.checkbox(
         "Only show towns with at least one seasonal water point",
