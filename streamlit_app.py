@@ -97,12 +97,12 @@ with st.container(border=True):
     st.markdown(
         """
 **Who is this for?** Anyone trying to understand where Lebanon's public water
-network reaches best, and where it doesn't — a resident, a policy analyst, or
+network reaches best, and where it doesn't: a resident, a policy analyst, or
 a student auditing the same dataset from the Plotly assignment.
 
 **What should they walk away knowing?** That water infrastructure quality is
 *uneven* across the country, that raw counts alone are misleading, and that
-missing data is itself part of the story — not something to ignore.
+missing data is itself part of the story, not something to ignore.
 """
     )
 
@@ -144,10 +144,10 @@ with st.sidebar:
 
     st.divider()
     town_query = st.text_input(
-        "Highlight a town (optional, bonus)",
+        "Highlight a town",
         key="town_query",
         placeholder="e.g. Baabdat",
-        help="Not one of the two graded filters — just highlights a matching town on the scatter chart below.",
+        help="Highlights a matching town on the scatter chart.",
     )
 
 selected_districts = st.session_state.district_sel
@@ -301,7 +301,7 @@ def make_box_chart(data: pd.DataFrame) -> go.Figure:
 
 # ============================================================
 # Charts, organized into tabs (keeps either pair in focus, not all 4 at once)
-# Each tab also has its own bonus filter, scoped to the fields it displays.
+# Each tab also has its own filter, scoped to the fields it displays.
 # ============================================================
 tab1, tab2 = st.tabs(["Access & condition", "Springs & water points"])
 
@@ -309,10 +309,10 @@ with tab1:
     filter_col, _ = st.columns([1, 2])
     with filter_col:
         min_access = st.slider(
-            "Minimum public network access (%) — bonus filter",
+            "Minimum public network access (%)",
             min_value=0, max_value=100, value=0, step=5, key="min_access",
-            help="Not one of the two graded filters — narrows the districts shown below to "
-                 "those with at least this much public network access.",
+            help="Narrows the districts shown below to those with at least this much "
+                 "public network access.",
         )
     access_by_district = fdf.groupby("District")["Potable water source - public network"].mean() * 100
     eligible_districts = access_by_district[access_by_district >= min_access].index
@@ -326,10 +326,10 @@ with tab1:
 
 with tab2:
     hide_zero_springs = st.checkbox(
-        "Only show towns with at least one spring or water point — bonus filter",
+        "Only show towns with at least one spring or water point",
         key="hide_zero_springs",
-        help="Not one of the two graded filters — 72% of towns report zero across these "
-             "fields; this hides them to declutter the charts below.",
+        help="72% of towns report zero across these fields; this hides them to declutter "
+             "the charts below.",
     )
     tab2_df = fdf
     if hide_zero_springs:
@@ -359,21 +359,21 @@ st.subheader("Key insights")
 col1, col2 = st.columns(2)
 with col1:
     with st.container(border=True):
-        st.markdown("**Raw counts mislead — normalize before comparing**")
+        st.markdown("**Raw counts mislead**")
         st.write(
-            "Akkar looks like a co-leader in public network access with 56 towns connected — "
-            "tied with Matn. But Akkar has 144 towns total, so that's only 38.9% coverage, "
-            "*below* the district median. Matn's 56 towns out of 72 means 77.8% coverage — "
-            "the real leader. Comparing districts of very different sizes only works once you "
+            "Akkar looks like a co-leader in public network access, tied with Matn at 56 "
+            "towns connected. But Akkar has 144 towns total, so that's only 38.9% coverage, "
+            "*below* the district median. Matn's 56 towns out of 72 means 77.8% coverage, the "
+            "real leader. Comparing districts of very different sizes only works once you "
             "divide by each district's own total."
         )
 with col2:
     with st.container(border=True):
-        st.markdown("**Missing data isn't random — it's part of the story**")
+        st.markdown("**Missing data isn't random**")
         st.write(
             "How completely a district reports its network condition varies from 22% missing "
             "(Matn) to 71% missing (Rashaya). A district with mostly 'Unknown' towns isn't "
-            "necessarily worse off — it may just be under-surveyed. Reading Good/Bad splits "
+            "necessarily worse off; it may just be under-surveyed. Reading Good/Bad splits "
             "without checking the Unknown share risks mistaking a reporting gap for a real problem."
         )
 
@@ -384,7 +384,7 @@ st.divider()
 # ============================================================
 st.subheader("Design justification")
 
-with st.expander("Governorate filter — why this widget?"):
+with st.expander("Why a Governorate filter?"):
     st.markdown(
         """
 **User question it answers:** *"Which region of Lebanon should I look at first?"*
@@ -392,34 +392,34 @@ with st.expander("Governorate filter — why this widget?"):
 **Why this widget:** A `st.multiselect` scopes the page to one or more governorates
 before any district-level detail appears. An `st.pills`/`st.segmented_control`
 (all options visible at once) was considered, since those read faster for small
-sets — but with 7 governorates feeding into up to 25 downstream districts, a
+sets. But with 7 governorates feeding into up to 25 downstream districts, a
 dropdown-based multiselect scales better and keeps the sidebar compact.
 
 **Course concept:** This is the *Who/What* framing from class, applied to data
 instead of an audience: *"the more you narrow down your target [scope], the
 better chance you have at successful communication."* Presenting all 25
 districts immediately would be exactly the kind of clutter the course warns
-against — this filter removes it before the reader even sees a chart.
+against; this filter removes it before the reader even sees a chart.
 """
     )
 
-with st.expander("District filter — why this widget?"):
+with st.expander("Why a District filter?"):
     st.markdown(
         """
 **User question it answers:** *"Within the region I picked, which specific
 districts do I want to compare?"*
 
 **Why this widget:** This `st.multiselect`'s **options are computed from the
-Governorate selection**, not fixed — picking "Mount Lebanon" narrows the list
+Governorate selection**, not fixed: picking "Mount Lebanon" narrows the list
 from 25 districts to 6. An independent second filter was considered and
-rejected: it would let a reader combine, say, Beqaa Governorate with Matn
-District (which isn't even in Beqaa) — a nonsensical selection the linked
+rejected, since it would let a reader combine, say, Beqaa Governorate with
+Matn District (which isn't even in Beqaa), a nonsensical selection the linked
 design makes structurally impossible.
 
-**Course concept:** This is *focusing attention* — the widget only ever shows
+**Course concept:** This is *focusing attention*: the widget only ever shows
 options relevant to the current context, so the reader compares real
 alternatives instead of scanning a flat list of 25 checkboxes. It's also the
-drill-down mechanic itself: Governorate sets the scope, District lets the
+drill-down mechanic itself. Governorate sets the scope, District lets the
 reader go one level deeper *inside* that scope, rather than filtering
 independently.
 """
