@@ -9,9 +9,12 @@ AUB Linked Data — 1,137 towns across 25 districts, 7 governorates).
 
 ## What it does
 
-- Reuses four visualizations from Assignment 1 (bar, line, scatter, box —
+- Reuses the visualizations from Assignment 1 (bar, line, scatter, box —
   organized into two tabs) and applies the same district relabeling /
-  data-cleaning work.
+  data-cleaning work. Network condition is shown as a 100% stacked bar per
+  district (including the Unknown share), and the line chart runs across the
+  ordered Good → Acceptable → Bad scale, comparing each district (gray) with
+  the national average (Berytus Red).
 - Adds a **linked, drill-down filter pair** in the sidebar: choosing a
   **Governorate** narrows the **District** multiselect's options to just that
   governorate's districts, so the two widgets can't be set to a nonsensical

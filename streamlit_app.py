@@ -22,6 +22,8 @@ STATE_COLS = {
     "State of the water network - acceptable": "Acceptable",
     "State of the water network - bad": "Bad",
 }
+CONDITIONS = ["Good", "Acceptable", "Bad"]
+CONDITION_COLORS = {"Good": BLACK, "Acceptable": GRAY, "Bad": BERYTUS_RED, "Unknown": PALE_GRAY}
 PERMANENT_SPRINGS = "Total number of permanent water springs"
 SEASONAL_SPRINGS = "Total number of seasonal water springs"
 SEASONAL_POINTS = "Total number of seasonal water points"
@@ -78,6 +80,12 @@ def load_data() -> pd.DataFrame:
     df["District"] = df["District"].replace(RELABEL_TO_DISTRICT)
     df["District"] = df["District"].str.replace(" District", "", regex=False)
     df["Governorate"] = df["District"].map(DISTRICT_TO_GOVERNORATE)
+
+    # towns flagging no state, or conflicting states (2 say both Good and Bad), count as Unknown
+    flags = df[list(STATE_COLS)]
+    df["Condition"] = np.where(
+        flags.sum(axis=1) == 1, flags.idxmax(axis=1).map(STATE_COLS), "Unknown"
+    )
 
     return df
 
@@ -167,11 +175,11 @@ is_filtered = len(fdf) < len(df)
 
 
 def summarize(data: pd.DataFrame) -> dict:
-    known = data[list(STATE_COLS)].sum(axis=1) >= 1
+    known = data["Condition"] != "Unknown"
     no_springs = (data[PERMANENT_SPRINGS] == 0) & (data[SEASONAL_SPRINGS] == 0)
     return {
         "access": data[PUBLIC_NETWORK].mean() * 100,
-        "good": data.loc[known, "State of the water network - good"].mean() * 100 if known.any() else np.nan,
+        "good": (data.loc[known, "Condition"] == "Good").mean() * 100 if known.any() else np.nan,
         "unknown": (~known).mean() * 100,
         "no_springs": no_springs.mean() * 100,
     }
@@ -245,29 +253,101 @@ def make_bar_chart(data: pd.DataFrame) -> go.Figure:
     return fig
 
 
-def make_line_chart(data: pd.DataFrame) -> go.Figure:
-    known = data[list(STATE_COLS)].sum(axis=1) >= 1
-    known_count = known.groupby(data["District"]).sum()
-    total_count = data.groupby("District").size()
+def make_condition_bar_chart(data: pd.DataFrame) -> go.Figure:
+    categories = CONDITIONS + ["Unknown"]
+    counts = pd.crosstab(data["District"], data["Condition"]).reindex(columns=categories, fill_value=0)
+    shares = counts.div(counts.sum(axis=1), axis=0) * 100
+    # horizontal bars draw bottom-up, so this puts the most complete reporting on top
+    shares = shares.sort_values("Unknown", ascending=False)
+    counts = counts.loc[shares.index]
 
-    share = data.groupby("District")[list(STATE_COLS)].sum().rename(columns=STATE_COLS)
-    share = share.div(known_count.replace(0, np.nan), axis=0) * 100
-    share["Unknown (% of all towns)"] = (1 - known_count / total_count) * 100
-    share = share.sort_values("Good", ascending=False).reset_index()
+    fig = go.Figure()
+    for cond in categories:
+        fig.add_trace(go.Bar(
+            y=shares.index, x=shares[cond], name=cond, orientation="h",
+            marker_color=CONDITION_COLORS[cond],
+            text=[f"{v:.0f}%" if v >= 8 else "" for v in shares[cond]],
+            textposition="inside", insidetextanchor="middle",
+            textfont=dict(color=BLACK if cond == "Unknown" else "white"),
+            customdata=counts[cond],
+            hovertemplate="<b>%{y}</b><br>" + cond + ": %{x:.1f}% (%{customdata} towns)<extra></extra>",
+        ))
+    fig.update_layout(
+        barmode="stack", height=max(260, 30 * len(shares) + 110),
+        font=BRAND_FONT, margin=dict(t=40),
+        legend=dict(orientation="h", yanchor="bottom", y=1.0, x=0, traceorder="normal"),
+        xaxis=dict(title="% of all towns", range=[0, 100], ticksuffix="%"),
+    )
+    return fig
 
-    fig = px.line(
-        share, x="District", y=["Good", "Acceptable", "Bad", "Unknown (% of all towns)"],
-        markers=True,
-        labels={"value": "%", "variable": "Network state"},
-        color_discrete_map={
-            "Good": BLACK, "Acceptable": GRAY, "Bad": BERYTUS_RED,
-            "Unknown (% of all towns)": LIGHT_GRAY,
-        },
+
+def national_profile() -> pd.Series:
+    reporting = df.loc[df["Condition"] != "Unknown", "Condition"]
+    return reporting.value_counts(normalize=True).reindex(CONDITIONS, fill_value=0) * 100
+
+
+def condition_profile(data: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
+    """Good/Acceptable/Bad shares among each district's reporting towns, and distance from national."""
+    counts = pd.crosstab(data["District"], data["Condition"]).reindex(columns=CONDITIONS, fill_value=0)
+    reporting = counts.sum(axis=1)
+    counts, reporting = counts[reporting > 0], reporting[reporting > 0]
+    shares = counts.div(reporting, axis=0) * 100
+    deviation = (shares - national_profile()).abs().sum(axis=1) / 2
+    return shares, reporting, deviation
+
+
+def most_different(reporting: pd.Series, deviation: pd.Series) -> str:
+    # ignore tiny samples (e.g. Tripoli: 3 reporting towns) unless nothing else qualifies
+    eligible = deviation[reporting >= 10]
+    return (eligible if not eligible.empty else deviation).idxmax()
+
+
+def make_condition_profile_chart(data: pd.DataFrame) -> go.Figure:
+    shares, reporting, deviation = condition_profile(data)
+    most = most_different(reporting, deviation)
+    label_all = len(shares) <= 5
+
+    nat = national_profile()
+    labels = []  # (end value, text, color)
+
+    fig = go.Figure()
+    # draw the emphasized district last so it sits on top of the gray lines
+    for district in [d for d in shares.index if d != most] + [most]:
+        emphasized = district == most
+        if emphasized or label_all:
+            labels.append((shares.loc[district, "Bad"], district, BLACK if emphasized else GRAY))
+        fig.add_trace(go.Scatter(
+            x=CONDITIONS, y=shares.loc[district], mode="lines+markers",
+            line=dict(color=BLACK if emphasized else (GRAY if label_all else LIGHT_GRAY),
+                      width=2.5 if emphasized else 1.5),
+            marker=dict(size=6 if emphasized else 4),
+            hovertemplate=f"<b>{district}</b><br>%{{x}}: %{{y:.1f}}%<extra></extra>",
+        ))
+
+    fig.add_trace(go.Scatter(
+        x=CONDITIONS, y=nat, mode="lines+markers",
+        line=dict(color=BERYTUS_RED, width=4), marker=dict(size=8),
+        hovertemplate="<b>National average</b><br>%{x}: %{y:.1f}%<extra></extra>",
+    ))
+    labels.append((nat["Bad"], "National average", BERYTUS_RED))
+
+    # nudge end labels apart so neighbouring lines don't hide each other's names
+    min_gap = max(shares.to_numpy().max(), nat.max()) * 0.06
+    placed = []
+    for value, text, color in sorted(labels):
+        y = value if not placed else max(value, placed[-1] + min_gap)
+        placed.append(y)
+        fig.add_annotation(
+            x=2, y=y, text=text, showarrow=False, xanchor="left", xshift=10,
+            font=dict(color=color, size=12),
+        )
+
+    fig.update_layout(
+        height=420, font=BRAND_FONT, showlegend=False,
+        margin=dict(t=20, r=140),
+        xaxis=dict(range=[-0.15, 2.15]),
+        yaxis=dict(title="% of towns that report a condition", ticksuffix="%", rangemode="tozero"),
     )
-    fig.for_each_trace(
-        lambda t: t.update(line=dict(dash="dash")) if t.name == "Unknown (% of all towns)" else None
-    )
-    fig.update_layout(xaxis_tickangle=-45, height=420, font=BRAND_FONT, margin=CHART_MARGIN)
     return fig
 
 
@@ -369,15 +449,14 @@ def access_insight(data: pd.DataFrame) -> tuple[str, str]:
 
 
 def condition_insight(data: pd.DataFrame) -> tuple[str, str]:
-    known = data[list(STATE_COLS)].sum(axis=1) >= 1
-    unknown = (1 - known.groupby(data["District"]).mean()) * 100
+    unknown = (data["Condition"] == "Unknown").groupby(data["District"]).mean() * 100
 
     if len(unknown) == 1:
         return (
             "Part of the picture is missing",
             f"{unknown.iloc[0]:.0f}% of towns in {unknown.index[0]} don't report the condition of "
             f"their water network (national: {national['unknown']:.0f}%). The Good, Acceptable "
-            "and Bad lines describe only the towns that do report.",
+            "and Bad shares describe only the towns that do report.",
         )
     return (
         "Missing data isn't random",
@@ -387,6 +466,33 @@ def condition_insight(data: pd.DataFrame) -> tuple[str, str]:
         "off; it may just be under-surveyed. Reading Good/Bad splits without checking the "
         "Unknown share risks mistaking a reporting gap for a real problem.",
     )
+
+
+def profile_insight(data: pd.DataFrame) -> tuple[str, str]:
+    shares, reporting, deviation = condition_profile(data)
+    nat = national_profile()
+    most = most_different(reporting, deviation)
+    r, n = shares.loc[most], reporting[most]
+
+    body = (
+        f"Nationally, towns that report a condition split {nat['Good']:.0f}% Good, "
+        f"{nat['Acceptable']:.0f}% Acceptable and {nat['Bad']:.0f}% Bad. "
+    )
+    if len(shares) == 1:
+        title = "Against the national pattern"
+        body += (
+            f"In {most}, the split is {r['Good']:.0f}% Good, {r['Acceptable']:.0f}% Acceptable "
+            f"and {r['Bad']:.0f}% Bad, based on {n} reporting towns."
+        )
+    else:
+        title = f"{most} stands apart"
+        body += (
+            f"{most} differs most from that pattern, with {r['Good']:.0f}% Good and "
+            f"{r['Bad']:.0f}% Bad across its {n} reporting towns."
+        )
+    if n < 15:
+        body += " With so few reporting towns, a handful of answers can swing these shares."
+    return title, body
 
 
 def springs_insight(data: pd.DataFrame) -> tuple[str, str]:
@@ -500,11 +606,23 @@ with tab1:
 
         chart_title(
             "Water network condition by district",
-            "Good, Acceptable and Bad are shares of towns with a known condition; "
-            "Unknown is a share of all towns.",
+            "Share of all towns in each district. Sorted from most to least complete "
+            "reporting; two towns that report both Good and Bad count as Unknown.",
         )
-        st.plotly_chart(make_line_chart(tab1_df), width="stretch")
+        st.plotly_chart(make_condition_bar_chart(tab1_df), width="stretch")
         insight_card(*condition_insight(tab1_df))
+
+        chart_title(
+            "How each district's condition compares with the national average",
+            "Each gray line is a district, based only on towns that report a condition; "
+            "the black line is the one that differs most from the national average "
+            "(among districts with at least 10 reporting towns).",
+        )
+        if (tab1_df["Condition"] == "Unknown").all():
+            st.info("None of the towns in the current selection report their network condition.")
+        else:
+            st.plotly_chart(make_condition_profile_chart(tab1_df), width="stretch")
+            insight_card(*profile_insight(tab1_df))
 
 with tab2:
     town_options = sorted(fdf["Town"].unique())
@@ -605,6 +723,7 @@ with st.expander("Show underlying data for the current selection"):
             "State of the water network - good",
             "State of the water network - acceptable",
             "State of the water network - bad",
+            "Condition",
             "Total number of permanent water springs",
             "Total number of seasonal water springs",
             "Total number of seasonal water points",
