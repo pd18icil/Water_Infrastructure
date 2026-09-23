@@ -142,14 +142,6 @@ with st.sidebar:
         help="Options are limited to districts inside the governorate(s) selected above.",
     )
 
-    st.divider()
-    town_query = st.text_input(
-        "Highlight a town",
-        key="town_query",
-        placeholder="e.g. Baabdat",
-        help="Highlights a matching town on the scatter chart.",
-    )
-
 selected_districts = st.session_state.district_sel
 
 if not selected_districts:
@@ -325,29 +317,30 @@ with tab1:
         st.plotly_chart(make_line_chart(tab1_df), width="stretch")
 
 with tab2:
-    hide_zero_springs = st.checkbox(
-        "Only show towns with at least one spring or water point",
-        key="hide_zero_springs",
-        help="72% of towns report zero across these fields; this hides them to declutter "
-             "the charts below.",
+    town_query = st.text_input(
+        "Highlight a town",
+        key="town_query",
+        placeholder="e.g. Baabdat",
+        help="Highlights a matching town on the scatter chart below.",
     )
-    tab2_df = fdf
-    if hide_zero_springs:
-        has_any = (
-            (fdf["Total number of permanent water springs"] > 0)
-            | (fdf["Total number of seasonal water springs"] > 0)
-            | (fdf["Total number of seasonal water points"] > 0)
-        )
-        tab2_df = fdf[has_any]
+    scatter_fig, town_matches = make_scatter_chart(fdf, town_query)
+    st.plotly_chart(scatter_fig, width="stretch")
+    if town_query.strip() and (town_matches is None or town_matches.empty):
+        st.caption(f"No town matching “{town_query}” in the current filter selection.")
 
-    if tab2_df.empty:
-        st.info("No towns in the current selection have any spring/water point data.")
+    hide_zero_points = st.checkbox(
+        "Only show towns with at least one seasonal water point",
+        key="hide_zero_points",
+        help="72% of towns report zero; this hides them to declutter the chart below.",
+    )
+    box_df = fdf
+    if hide_zero_points:
+        box_df = fdf[fdf["Total number of seasonal water points"] > 0]
+
+    if box_df.empty:
+        st.info("No towns in the current selection have any seasonal water points.")
     else:
-        scatter_fig, town_matches = make_scatter_chart(tab2_df, town_query)
-        st.plotly_chart(scatter_fig, width="stretch")
-        if town_query.strip() and (town_matches is None or town_matches.empty):
-            st.caption(f"No town matching “{town_query}” in the current filter selection.")
-        st.plotly_chart(make_box_chart(tab2_df), width="stretch")
+        st.plotly_chart(make_box_chart(box_df), width="stretch")
 
 st.divider()
 
