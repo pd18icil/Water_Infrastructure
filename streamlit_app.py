@@ -306,12 +306,14 @@ def make_box_chart(data: pd.DataFrame) -> go.Figure:
 tab1, tab2 = st.tabs(["Access & condition", "Springs & water points"])
 
 with tab1:
-    min_access = st.slider(
-        "Minimum public network access (%) — bonus filter",
-        min_value=0, max_value=100, value=0, step=5, key="min_access",
-        help="Not one of the two graded filters — narrows the districts shown below to "
-             "those with at least this much public network access.",
-    )
+    filter_col, _ = st.columns([1, 2])
+    with filter_col:
+        min_access = st.slider(
+            "Minimum public network access (%) — bonus filter",
+            min_value=0, max_value=100, value=0, step=5, key="min_access",
+            help="Not one of the two graded filters — narrows the districts shown below to "
+                 "those with at least this much public network access.",
+        )
     access_by_district = fdf.groupby("District")["Potable water source - public network"].mean() * 100
     eligible_districts = access_by_district[access_by_district >= min_access].index
     tab1_df = fdf[fdf["District"].isin(eligible_districts)]
