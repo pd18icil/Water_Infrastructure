@@ -112,18 +112,18 @@ ALL_GOVERNORATES = sorted(df["Governorate"].unique())
 # ============================================================
 st.title("Lebanon Water Infrastructure")
 
-with st.container(border=True):
-    st.markdown(
-        """
-**Who is this for?** Anyone trying to understand where Lebanon's public water
-network reaches best, and where it doesn't: a resident, a policy analyst, or
-a student auditing the same dataset from the Plotly assignment.
+access_by_district_all = df.groupby("District")[PUBLIC_NETWORK].mean() * 100
+unreported_all = df[CONDITION_WEIGHTS["Unknown"]].mean() * 100
 
-**What should they walk away knowing?** That water infrastructure quality is
-*uneven* across the country, that raw counts alone are misleading, and that
-missing data is itself part of the story, not something to ignore.
-"""
-    )
+st.markdown(
+    f"Access to the public water network ranges from **{access_by_district_all.min():.0f}%** "
+    f"of towns in {access_by_district_all.idxmin()} to **{access_by_district_all.max():.0f}%** "
+    f"in {access_by_district_all.idxmax()}, and **{unreported_all:.0f}%** of towns don't report "
+    "their network's condition at all. Because districts differ so much in size, every "
+    "comparison here uses shares of towns rather than raw counts. Built for residents, policy "
+    "analysts and students who want to see where coverage is strong, where it lags, and "
+    "where the data itself is thin."
+)
 
 # ============================================================
 # Sidebar — the two REQUIRED linked interaction features
@@ -223,7 +223,10 @@ if is_filtered:
         f"district{'s' if n_districts != 1 else ''} in {', '.join(govs)}"
     )
 else:
-    st.caption(f"Showing all {len(df):,} towns across {df['District'].nunique()} districts")
+    st.caption(
+        f"Showing all {len(df):,} towns across {df['District'].nunique()} districts. "
+        "Use the filters in the sidebar to focus on a governorate or district."
+    )
 
 with st.container(horizontal=True):
     kpi("Public network access", "access",
