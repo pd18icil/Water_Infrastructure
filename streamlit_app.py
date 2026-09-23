@@ -291,6 +291,13 @@ def make_box_chart(data: pd.DataFrame) -> go.Figure:
     return fig
 
 
+def insight_card(title: str, body: str) -> None:
+    """A finding grounded in the full dataset, shown directly under the chart it explains."""
+    with st.container(border=True):
+        st.markdown(f"**{title}**")
+        st.write(body)
+
+
 # ============================================================
 # Charts, organized into tabs (keeps either pair in focus, not all 4 at once)
 # Each tab also has its own filter, scoped to the fields it displays.
@@ -314,7 +321,24 @@ with tab1:
         st.info("No districts in the current selection meet that access threshold.")
     else:
         st.plotly_chart(make_bar_chart(tab1_df), width="stretch")
+        insight_card(
+            "Raw counts mislead",
+            "Akkar looks like a co-leader in public network access, tied with Matn at 56 "
+            "towns connected. But Akkar has 144 towns total, so that's only 38.9% coverage, "
+            "below the district median. Matn's 56 towns out of 72 means 77.8% coverage, the "
+            "real leader. Comparing districts of very different sizes only works once you "
+            "divide by each district's own total.",
+        )
+
         st.plotly_chart(make_line_chart(tab1_df), width="stretch")
+        insight_card(
+            "Missing data isn't random",
+            "How completely a district reports its network condition varies from 22% missing "
+            "(Matn) to 71% missing (Rashaya). A district with mostly 'Unknown' towns isn't "
+            "necessarily worse off; it may just be under-surveyed. Reading Good/Bad splits "
+            "without checking the Unknown share risks mistaking a reporting gap for a real "
+            "problem.",
+        )
 
 with tab2:
     town_options = sorted(fdf["Town"].unique())
@@ -333,6 +357,14 @@ with tab2:
         ) or ""
     scatter_fig, town_matches = make_scatter_chart(fdf, town_query)
     st.plotly_chart(scatter_fig, width="stretch")
+    insight_card(
+        "Springs are rare and lopsided",
+        "Permanent and seasonal spring counts are only moderately correlated (r ≈ 0.54), "
+        "and a handful of towns account for nearly all of the extremes: Rahbeh (Akkar) "
+        "reports 100 permanent and 365 seasonal springs, Aammatour (Chouf) reports 115 and "
+        "250, and Mayrouba (Keserwan) has the highest permanent count of any town (150). "
+        "Meanwhile, 55% of all towns report zero springs of either type.",
+    )
 
     hide_zero_points = st.checkbox(
         "Only show towns with at least one seasonal water point",
@@ -347,33 +379,12 @@ with tab2:
         st.info("No towns in the current selection have any seasonal water points.")
     else:
         st.plotly_chart(make_box_chart(box_df), width="stretch")
-
-st.divider()
-
-# ============================================================
-# Key insights (grounded in the full dataset, not the current filter)
-# ============================================================
-st.subheader("Key insights")
-
-col1, col2 = st.columns(2)
-with col1:
-    with st.container(border=True):
-        st.markdown("**Raw counts mislead**")
-        st.write(
-            "Akkar looks like a co-leader in public network access, tied with Matn at 56 "
-            "towns connected. But Akkar has 144 towns total, so that's only 38.9% coverage, "
-            "*below* the district median. Matn's 56 towns out of 72 means 77.8% coverage, the "
-            "real leader. Comparing districts of very different sizes only works once you "
-            "divide by each district's own total."
-        )
-with col2:
-    with st.container(border=True):
-        st.markdown("**Missing data isn't random**")
-        st.write(
-            "How completely a district reports its network condition varies from 22% missing "
-            "(Matn) to 71% missing (Rashaya). A district with mostly 'Unknown' towns isn't "
-            "necessarily worse off; it may just be under-surveyed. Reading Good/Bad splits "
-            "without checking the Unknown share risks mistaking a reporting gap for a real problem."
+        insight_card(
+            "A handful of towns skew every district",
+            "72% of all towns report zero seasonal water points, and the median is 0 in "
+            "every one of the top districts by town count. Akkar's mean (1.94) looks "
+            "meaningfully higher than its neighbors, but that's driven by a single outlier "
+            "town reporting 200, not a district-wide pattern.",
         )
 
 st.divider()

@@ -16,9 +16,10 @@ AUB Linked Data — 1,137 towns across 25 districts, 7 governorates).
   **Governorate** narrows the **District** multiselect's options to just that
   governorate's districts, so the two widgets can't be set to a nonsensical
   combination.
-- Surfaces two data-grounded insights (raw counts vs. normalized coverage;
-  uneven reporting completeness) plus a live KPI row that reacts to the
-  current filter.
+- Surfaces one data-grounded insight directly under each of the four charts
+  (raw counts vs. normalized coverage, uneven reporting completeness, spring
+  correlation and outliers, skewed water-point distributions), plus a live
+  KPI row that reacts to the current filter.
 - Includes a short design-justification write-up for each of the two linked
   filters, explaining the user question it answers, why that widget was
   chosen over an alternative, and which course concept it applies.
