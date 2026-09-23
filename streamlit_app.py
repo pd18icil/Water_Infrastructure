@@ -125,8 +125,6 @@ missing data is itself part of the story, not something to ignore.
 """
     )
 
-st.divider()
-
 # ============================================================
 # Sidebar — the two REQUIRED linked interaction features
 # ============================================================
@@ -236,8 +234,6 @@ with st.container(horizontal=True):
         "Share of towns that report no network condition at all.", False)
     kpi("Towns with no springs", "no_springs",
         "Share of towns reporting zero permanent and zero seasonal springs.", False)
-
-st.divider()
 
 # ============================================================
 # Chart builders (mirror Assignment 1's notebook logic)
@@ -409,9 +405,11 @@ def make_box_chart(data: pd.DataFrame) -> go.Figure:
     tick_values = [0, 1, 2, 5, 10, 20, 50, 100, 200]
     tick_positions = [np.log10(v + 1) for v in tick_values]
 
+    district_order = plot_df.groupby("District")[SEASONAL_POINTS].mean().sort_values(ascending=False).index
+
     fig = px.box(
         plot_df, x="District", y="Seasonal water points (log1p)",
-        points="outliers",
+        points="outliers", category_orders={"District": list(district_order)},
         hover_data={"Seasonal water points (log1p)": False, SEASONAL_POINTS: True},
         color_discrete_sequence=[BERYTUS_RED],
     )
@@ -661,7 +659,8 @@ with tab2:
 
     chart_title(
         "Distribution of seasonal water points by district",
-        "Log scale. Dots are individual towns far above their district's typical value.",
+        "Log scale, districts sorted by average per town (highest first). Dots are "
+        "individual towns far above their district's typical value.",
     )
     hide_zero_points = st.checkbox(
         "Only show towns with at least one seasonal water point",
@@ -683,7 +682,7 @@ st.divider()
 # ============================================================
 # Design justification — the two REQUIRED linked filters
 # ============================================================
-st.subheader("Design justification")
+st.subheader("About this dashboard")
 
 with st.expander("Why a Governorate filter?"):
     st.markdown(
@@ -725,8 +724,6 @@ reader go one level deeper *inside* that scope, rather than filtering
 independently.
 """
     )
-
-st.divider()
 
 with st.expander("Show underlying data for the current selection"):
     st.dataframe(
