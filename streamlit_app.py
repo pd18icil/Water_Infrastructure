@@ -135,7 +135,7 @@ FILTER_DEFAULTS = {
     "district_sel": [],
     "min_access": 0,
     "town_query": None,
-    "hide_zero_points": False,
+    "hide_zero_points": True,
 }
 
 
@@ -540,30 +540,38 @@ def springs_insight(data: pd.DataFrame) -> tuple[str, str]:
     return title, " ".join(sentences)
 
 
-def water_points_insight(data: pd.DataFrame) -> tuple[str, str]:
+def water_points_insight(data: pd.DataFrame, zeros_hidden: bool) -> tuple[str, str]:
     points = data[SEASONAL_POINTS]
     if points.sum() == 0:
         return "None reported", "No town in the current selection reports any seasonal water points."
 
     zero_share = (points == 0).mean() * 100
-    medians = data.groupby("District")[SEASONAL_POINTS].median()
-    if len(medians) == 1:
-        median_text = f"the median town in {medians.index[0]} reports {medians.iloc[0]:.0f}"
-    else:
-        median_text = f"the median is 0 in {(medians == 0).sum()} of {len(medians)} districts"
+    shown = data[points > 0] if zeros_hidden else data
 
-    means = data.groupby("District")[SEASONAL_POINTS].mean()
+    if zeros_hidden:
+        body = (
+            f"{zero_share:.0f}% of towns in view report no seasonal water points and are hidden "
+            f"here. Among the {len(shown):,} that report any, the typical town has "
+            f"{shown[SEASONAL_POINTS].median():.0f}. "
+        )
+    else:
+        medians = data.groupby("District")[SEASONAL_POINTS].median()
+        if len(medians) == 1:
+            median_text = f"the median town in {medians.index[0]} reports {medians.iloc[0]:.0f}"
+        else:
+            median_text = f"the median is 0 in {(medians == 0).sum()} of {len(medians)} districts"
+        body = f"{zero_share:.0f}% of towns in view report zero seasonal water points, and {median_text}. "
+
+    means = shown.groupby("District")[SEASONAL_POINTS].mean()
     top = means.idxmax()
-    district_towns = data[data["District"] == top]
+    district_towns = shown[shown["District"] == top]
     peak = district_towns.loc[district_towns[SEASONAL_POINTS].idxmax()]
     mean_without_peak = district_towns.drop(peak.name)[SEASONAL_POINTS].mean()
 
-    body = (
-        f"{zero_share:.0f}% of towns in view report zero seasonal water points, and {median_text}. "
-    )
+    unit = "per reporting town" if zeros_hidden else "per town"
     lead = (
-        f"{top}'s average is {means[top]:.2f} per town" if len(means) == 1
-        else f"{top} has the highest average ({means[top]:.2f} per town)"
+        f"{top}'s average is {means[top]:.2f} {unit}" if len(means) == 1
+        else f"{top} has the highest average ({means[top]:.2f} {unit})"
     )
     if len(district_towns) > 1 and mean_without_peak < means[top] * 0.6:
         title = "A handful of towns skew the averages"
@@ -573,7 +581,7 @@ def water_points_insight(data: pd.DataFrame) -> tuple[str, str]:
             f"{mean_without_peak:.2f}."
         )
     else:
-        title = "Most towns report none"
+        title = "Most towns report none" if zero_share >= 50 else "Where the water points are"
         body += f"{lead}."
     return title, body
 
@@ -660,15 +668,19 @@ with tab2:
     st.plotly_chart(make_scatter_chart(fdf, town_query), width="stretch")
     insight_card(*springs_insight(fdf))
 
+    st.session_state.setdefault("hide_zero_points", FILTER_DEFAULTS["hide_zero_points"])
     chart_title(
-        "Distribution of seasonal water points by district",
+        "Seasonal water points by district, among towns that report any"
+        if st.session_state.hide_zero_points
+        else "Seasonal water points by district, all towns",
         "Log scale, districts sorted by average per town (highest first). Dots are "
         "individual towns far above their district's typical value.",
     )
     hide_zero_points = st.checkbox(
         "Only show towns with at least one seasonal water point",
         key="hide_zero_points",
-        help="Most towns report zero; this hides them to declutter the chart below.",
+        help="Ticked by default because most towns report zero, which flattens every box. "
+             "Untick to include them.",
     )
     box_df = fdf
     if hide_zero_points:
@@ -678,7 +690,7 @@ with tab2:
         st.info("No towns in the current selection have any seasonal water points.")
     else:
         st.plotly_chart(make_box_chart(box_df), width="stretch")
-        insight_card(*water_points_insight(fdf))
+        insight_card(*water_points_insight(fdf, hide_zero_points))
 
 st.divider()
 
