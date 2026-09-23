@@ -31,7 +31,6 @@ SYMBOLS = ["circle", "square", "diamond", "triangle-up", "x", "star", "triangle-
 
 st.set_page_config(
     page_title="Lebanon Water Infrastructure",
-    page_icon="💧",
     layout="wide",
 )
 
@@ -92,11 +91,7 @@ ALL_GOVERNORATES = sorted(df["Governorate"].unique())
 # ============================================================
 # Header / context (Who / What framing)
 # ============================================================
-st.title(":material/water_drop: Lebanon Water Infrastructure")
-st.caption(
-    "Data: Impact Open Data / AUB Linked Data · 1,137 towns across 25 districts, "
-    "7 governorates · continued from the Plotly practice assignment"
-)
+st.title("Lebanon Water Infrastructure")
 
 with st.container(border=True):
     st.markdown(
@@ -154,9 +149,6 @@ with st.sidebar:
         placeholder="e.g. Baabdat",
         help="Not one of the two graded filters — just highlights a matching town on the scatter chart below.",
     )
-
-    st.divider()
-    st.caption("Built with Streamlit + Plotly · reuses Assignment 1's cleaned dataset")
 
 selected_districts = st.session_state.district_sel
 
@@ -390,7 +382,7 @@ st.divider()
 # ============================================================
 st.subheader("Design justification")
 
-with st.expander(":material/map: Governorate filter — why this widget?"):
+with st.expander("Governorate filter — why this widget?"):
     st.markdown(
         """
 **User question it answers:** *"Which region of Lebanon should I look at first?"*
@@ -409,7 +401,7 @@ against — this filter removes it before the reader even sees a chart.
 """
     )
 
-with st.expander(":material/pin_drop: District filter — why this widget?"):
+with st.expander("District filter — why this widget?"):
     st.markdown(
         """
 **User question it answers:** *"Within the region I picked, which specific
@@ -447,9 +439,3 @@ with st.expander("Show underlying data for the current selection"):
         ]].reset_index(drop=True),
         width="stretch",
     )
-
-st.caption(
-    "Methodology note: `refArea` mixed Governorate- and District-level admin codes in the "
-    "source data; districts were relabeled and cross-checked against town names before this "
-    "app was built (see Assignment 1 notebook)."
-)
